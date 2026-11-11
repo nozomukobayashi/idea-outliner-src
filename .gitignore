@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.local
+# 社内のホスト名などを書く設定ファイル（example をコピーして使う）
+idea-outliner.config.json
+.DS_Store

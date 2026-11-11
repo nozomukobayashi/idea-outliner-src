@@ -1,0 +1,4 @@
+{
+  "defaultHost": "ghe.example.com",
+  "allowOtherHosts": false
+}
