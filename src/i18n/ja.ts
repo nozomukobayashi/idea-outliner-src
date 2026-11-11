@@ -1,7 +1,7 @@
 /** UI 文言（日本語）。多言語化に備えて文言はここにまとめる */
 export const ja = {
   app: {
-    name: 'Idea Outliner',
+    name: 'tane',
     setup: {
       heading: 'GitHub に接続',
       lead: 'ノートは GitHub / GitHub Enterprise Server のリポジトリ（Discussions）に保存されています。接続先とトークンを入力してください。',
@@ -186,7 +186,7 @@ export const ja = {
     },
   },
   spike: {
-    title: 'Idea Outliner — M0 スパイク',
+    title: 'tane — M0 スパイク',
     lead: 'DESIGN.md §9 の確認項目を、このブラウザから GitHub / GHES の API を直接呼んで確かめる検証ページです。',
     connection: {
       heading: '接続',

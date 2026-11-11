@@ -263,7 +263,7 @@ async function getRepoId(client: GitHubClient, repo: RepoRef): Promise<string> {
 async function createIssueGql(client: GitHubClient, repoId: string, repo: RepoRef, title: string): Promise<CreatedIssue> {
   const r = await client.graphql<{ createIssue: { issue: { id: string; databaseId: number; number: number; url: string } } }>(
     'mutation($input: CreateIssueInput!) { createIssue(input: $input) { issue { id databaseId number url } } }',
-    { input: { repositoryId: repoId, title: `${TITLE_PREFIX} ${title} ${stamp()}`, body: 'Idea Outliner のスパイク検証で作成した Issue です。' } },
+    { input: { repositoryId: repoId, title: `${TITLE_PREFIX} ${title} ${stamp()}`, body: 'tane のスパイク検証で作成した Issue です。' } },
   );
   return { ...r.createIssue.issue, repo };
 }
@@ -272,7 +272,7 @@ async function createIssueRest(client: GitHubClient, repo: RepoRef, title: strin
   const r = await client.rest<{ id: number; node_id: string; number: number; html_url: string }>(
     'POST',
     `/repos/${repo.owner}/${repo.name}/issues`,
-    { title: `${TITLE_PREFIX} ${title} ${stamp()}`, body: 'Idea Outliner のスパイク検証で作成した Issue です（REST）。' },
+    { title: `${TITLE_PREFIX} ${title} ${stamp()}`, body: 'tane のスパイク検証で作成した Issue です（REST）。' },
   );
   return { id: r.data.node_id, databaseId: r.data.id, number: r.data.number, url: r.data.html_url, repo };
 }

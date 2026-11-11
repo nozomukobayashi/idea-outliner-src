@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-このリポジトリは Idea Outliner：GitHub / GHES の Discussions と Issues を土台にした、チームで共有するアウトライナー（静的 Web アプリ）。
+このリポジトリは tane：GitHub / GHES の Discussions と Issues を土台にした、チームで共有するアウトライナー（静的 Web アプリ）。
 
 ## 最初に読むもの
 - 設計: `docs/DESIGN.md`（仕様の正。迷ったらここに従い、変える場合は先に設計書を更新する）

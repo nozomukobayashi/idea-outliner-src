@@ -1,4 +1,4 @@
-# Idea Outliner（仮）
+# tane
 
 GitHub / GitHub Enterprise Server の Discussions と Issues を使った、チームで共有できるアウトライナーです。
 

@@ -1,6 +1,6 @@
 # 配布のしかた
 
-Idea Outliner は静的サイトです。`npm run build` で `dist/` に出力したファイルを、GitHub Pages / GHE Pages に置くだけで動きます。サーバーの設定は要りません。
+tane は静的サイトです。`npm run build` で `dist/` に出力したファイルを、GitHub Pages / GHE Pages に置くだけで動きます。サーバーの設定は要りません。
 ファイルは相対パスで出力しているので、`https://<host>/<owner>/<repo>/` のようなサブパスにも置けます。
 
 ## 1. 既定の接続先を決める

@@ -1,4 +1,4 @@
-# Idea Outliner 設計書
+# tane 設計書
 
 GitHub / GitHub Enterprise Server (GHES) の Discussions と Issues を土台にした、チームで共有できるアウトライナー。
 アイディアやメモをアウトラインで書き溜め、良いものを Issue に昇格させ、議論は Discussion のコメントで行う。
@@ -185,7 +185,7 @@ Discussion 本文の更新には楽観的ロックの仕組みがないため、
 
 ## 6. 画面
 
-モック: Idea Outliner モック（Claude で作成したデザインキャンバス）
+モック: tane モック（Claude で作成したデザインキャンバス）
 
 - 上部バー: 接続先・ワークスペース（リポジトリ）切り替え、検索、同期状態
 - 左: ノート一覧（カテゴリごと）、新規ノート
@@ -304,8 +304,8 @@ M5 での決めごと:
 
 ## 11. 未決事項
 
-- アプリ名（仮: Idea Outliner）
 
 決定済み:
+- アプリ名: tane（アイディアの「種」）。本文のコメント（`idea-outliner:v1` など）、保存領域のキー、設定ファイル名、環境変数は、既存のノートとの互換のため `idea-outliner` のままにする
 - ライセンス: MIT（著作権者の表示は Idea Outliner contributors）
 - Discussion カテゴリ: アプリからは作らず、セットアップガイドで案内する（Discussions を有効にすると既定のカテゴリができる）
