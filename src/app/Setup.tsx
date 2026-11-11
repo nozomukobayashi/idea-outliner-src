@@ -9,7 +9,7 @@ import { formatRoute, parseRoute } from './route';
 
 const t = ja.app.setup;
 
-export function Setup(props: { initialHost?: string; onCancel?: () => void }) {
+export function Setup(props: { initialHost?: string; onCancel?: () => void; onConnected: () => void }) {
   const [host, setHost] = useState(() => {
     const initial = props.initialHost ?? BUILD_CONFIG.defaultHost;
     return initial !== 'github.com' || HOST_LOCKED ? initial : '';
@@ -37,11 +37,9 @@ export function Setup(props: { initialHost?: string; onCancel?: () => void }) {
     saveToken(normalized, token.trim(), persist);
     rememberConnection(normalized);
     setToken('');
-    // 再読み込み後の入れ直しでは、開いていたノートに戻す
-    const current = parseRoute(location.hash);
-    if (current.host === normalized || (HOST_LOCKED && !current.host)) window.dispatchEvent(new HashChangeEvent('hashchange'));
-    else location.hash = formatRoute({ host: normalized, repo: null, number: null });
-    props.onCancel?.();
+    // 同じホストなら URL はそのまま（再読み込み後の入れ直しでは、開いていたノートに戻す）
+    if (!HOST_LOCKED && parseRoute(location.hash).host !== normalized) location.hash = formatRoute({ host: normalized, repo: null, number: null });
+    props.onConnected();
   }
 
   function remove(h: string) {

@@ -14,6 +14,8 @@ import { WorkspacePicker } from './WorkspacePicker';
 export function App() {
   const route = useHashRoute();
   const [managing, setManaging] = useState(false);
+  // トークンは state ではないので、接続したときは明示的に描画し直す
+  const [, setConnections] = useState(0);
 
   // ハッシュにホストがなければ、前回の接続先へ
   const fallbackHost = route.host || HOST_LOCKED ? null : (lastHost() ?? listConnections()[0] ?? null);
@@ -46,7 +48,10 @@ export function App() {
   }, []);
 
   if (managing || !client) {
-    return <Setup key={host ?? ''} initialHost={host ?? undefined} onCancel={client ? () => setManaging(false) : undefined} />;
+    return <Setup key={host ?? ''} initialHost={host ?? undefined} onCancel={client ? () => setManaging(false) : undefined} onConnected={() => {
+      setManaging(false);
+      setConnections((n) => n + 1);
+    }} />;
   }
   if (!route.repo) return <WorkspacePicker client={client} />;
   return <Workspace client={client} repo={route.repo} number={route.number} onManageConnections={() => setManaging(true)} />;
