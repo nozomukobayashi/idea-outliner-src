@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { connectionFromHost } from '../config/connection';
-import { addComment, buildIssueStatesQuery, createNote, getIssueTarget, getWorkspace, fetchIssueStates, getNote, getNoteBody, listComments, listNotes, listOwnerRepos, listViewerRepos, updateNoteBody } from './api';
+import { addComment, buildIssueStatesQuery, createNote, getIssueTarget, getWorkspace, fetchIssueStates, getNote, getNoteBody, listComments, listNotes, listOwnerRepos, listViewerRepos, searchIssues, updateNoteBody } from './api';
 import { createGitHubClient, type FetchLike } from './client';
 
 const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -196,5 +196,40 @@ describe('見えないリポジトリ', () => {
   ])('%s: NOT_FOUND は null、それ以外は例外', async (_, call) => {
     expect(await call(vi.fn<FetchLike>(async () => notFound()))).toBeNull();
     await expect(call(vi.fn<FetchLike>(async () => forbidden()))).rejects.toThrow('FORBIDDEN');
+  });
+});
+
+describe('Issue の補完', () => {
+  const issue = (number: number, title: string, state = 'OPEN', stateReason: string | null = null) => ({ number, title, state, stateReason });
+  const repo = { owner: 'o', name: 'r' };
+
+  it('空なら最近の Issue', async () => {
+    const f = vi.fn<FetchLike>(async () => json({ data: { repository: { issues: { nodes: [issue(12, 'a'), issue(3, 'b', 'CLOSED', 'NOT_PLANNED')] } } } }));
+    expect(await searchIssues(clientWith(f), repo, '')).toEqual([
+      { number: 12, title: 'a', state: 'open' },
+      { number: 3, title: 'b', state: 'not_planned' },
+    ]);
+    expect(sentBody(f).query).not.toContain('exact:');
+  });
+
+  it('数字なら番号の前方一致で、ちょうどの番号を先頭にする', async () => {
+    const f = vi.fn<FetchLike>(async () =>
+      json({ data: { repository: { issues: { nodes: [issue(120, 'x'), issue(12, 'y'), issue(5, 'z')] }, exact: issue(12, 'y') } } }),
+    );
+    expect((await searchIssues(clientWith(f), repo, '12')).map((i) => i.number)).toEqual([12, 120]);
+    expect(sentBody(f).query).toContain('exact: issue(number: 12)');
+  });
+
+  it('文字なら題名で検索し、別のリポジトリの結果は除く', async () => {
+    const f = vi.fn<FetchLike>(async () =>
+      json({ data: { search: { nodes: [{ ...issue(7, 'ログ出力'), repository: { nameWithOwner: 'o/r' } }, { ...issue(8, '他'), repository: { nameWithOwner: 'x/y' } }, {}] } } }),
+    );
+    expect(await searchIssues(clientWith(f), repo, 'ログ "repo:x/y"')).toEqual([{ number: 7, title: 'ログ出力', state: 'open' }]);
+    expect(sentBody(f).variables.q).toBe('repo:o/r is:issue in:title ログ  repo:x/y');
+  });
+
+  it('見えないリポジトリは空', async () => {
+    const f = vi.fn<FetchLike>(async () => json({ data: { repository: null }, errors: [{ type: 'NOT_FOUND', message: 'x' }] }));
+    expect(await searchIssues(clientWith(f), repo, '')).toEqual([]);
   });
 });

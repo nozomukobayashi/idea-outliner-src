@@ -3,6 +3,24 @@
 tane は静的サイトです。`npm run build` で `dist/` に出力したファイルを、GitHub Pages / GHE Pages に置くだけで動きます。サーバーの設定は要りません。
 ファイルは相対パスで出力しているので、`https://<host>/<owner>/<repo>/` のようなサブパスにも置けます。
 
+## かんたんな方法（社内 GHE Pages、スクリプト）
+
+最新の取得からビルド、確認、push までを 1 つのコマンドで行います。Git と npm（Node.js）が使える環境、たとえば devcontainer で実行します。
+
+```bash
+scripts/deploy-pages.sh https://<GHE のホスト>/<owner>/<repo>.git
+```
+
+- 初回は社内 GHE のホスト名を聞かれます。`idea-outliner.config.json`（Git の管理外）に保存し、次回からは聞きません
+- 置き先の URL はこのリポジトリの `.git/config` に覚えるので、2 回目からは `scripts/deploy-pages.sh` だけで更新できます
+- Node.js が古い（20.19 / 22.12 未満）ときは、新しい Node.js を一時的に使ってビルドします
+- 接続先が固定されていない、または例（`example.com`）のままのビルドは push しません
+- `--dry-run` でビルドと確認だけ、`--no-pull` で最新を取得せずに実行します
+
+置き先のリポジトリの Settings → Pages で、`gh-pages` ブランチを公開元にしておいてください（初回のみ）。
+
+以下は、スクリプトを使わない場合の詳しい手順です。
+
 ## 1. 既定の接続先を決める
 
 | 配布先 | 設定 | 動作 |
@@ -39,13 +57,26 @@ cp idea-outliner.config.example.json idea-outliner.config.json
 
 ### A. GitHub Actions を使う
 
-`.github/workflows/deploy-pages.yml` が、`main` への push で自動的にビルドして公開します。
+`.github/workflows/deploy-pages.yml` が、`main` への push で自動的にビルドして公開します。ソースを置いたリポジトリにそのまま Pages ができます。
 
-1. リポジトリの **Settings → Pages** で Source を **GitHub Actions** にする
-2. 社内版なら **Settings → Secrets and variables → Actions → Variables** に `IDEA_OUTLINER_DEFAULT_HOST` を追加する
+**社内 GHE の場合（設定はほぼ不要）**
+
+1. 社内 GHE にリポジトリを作り（例: `team-a/tane`）、ソースの `main` を push する
+2. そのリポジトリの **Settings → Pages** で Source を **GitHub Actions** にする
+3. **Actions** の画面でワークフローが動き、終わると Pages の URL が表示される
+
+- 接続先は、ワークフローが動いている GHE が自動で使われ、固定されます。固定されていないビルドはデプロイしません
+- ランナーは `self-hosted` ラベルのものを使います。違うラベルなら、**Settings → Secrets and variables → Actions → Variables** に `TANE_RUNNER` を追加します
+- ランナーから npm のレジストリと、Node.js の取得（`actions/setup-node`）に接続できる必要があります。公式アクション（`actions/checkout`、`actions/deploy-pages` など）が GHE で使えることも必要です
+- 更新は、新しいソースを `main` に push するだけです
+
+**github.com の場合**
+
+1. **Settings → Pages** で Source を **GitHub Actions** にする
+2. 社内版を github.com の Actions でビルドするなら、Variables に `IDEA_OUTLINER_DEFAULT_HOST` を追加する（社内のホスト名が github.com に残るので、通常は社内 GHE でビルドしてください）
 3. `main` に push するか、**Actions** の画面から手動で実行する
 
-GHES の場合は、Actions が有効で、ランナーと公式アクション（`actions/checkout` など）が使える必要があります。`runs-on: ubuntu-latest` は環境に合わせて（例: `self-hosted`）書き換えてください。使えない環境では次の手動の方法を使います。
+Actions が使えない環境では、上のスクリプトか、次の手動の方法を使います。
 
 ### B. 手動で置く
 

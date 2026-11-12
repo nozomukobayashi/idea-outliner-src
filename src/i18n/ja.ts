@@ -78,6 +78,10 @@ export const ja = {
         todo: 'TODO 切替',
         delete: '削除',
       },
+      completion: {
+        label: '候補',
+        loading: '候補を探しています…',
+      },
       shortcuts: 'Enter: 行を追加 / Tab, Shift+Tab: インデント / Alt+↑↓: 並べ替え / Ctrl(⌘)+Enter: TODO 切替 / Ctrl(⌘)+S: 保存',
     },
     save: {

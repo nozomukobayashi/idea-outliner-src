@@ -1,5 +1,10 @@
 name: Deploy to Pages
 
+# main への push で、ビルドして Pages に公開する。github.com と GHES の両方で動く。
+# - GHES では、ワークフローが動いている GHE を接続先にして固定したビルドを作る（設定不要）
+# - ランナーは github.com では ubuntu-latest、GHES では self-hosted。変数 TANE_RUNNER で変えられる
+# - リポジトリの Settings → Pages で Source を「GitHub Actions」にしておく
+
 on:
   push:
     branches: [main]
@@ -16,7 +21,7 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.TANE_RUNNER || (github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted') }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -24,15 +29,30 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
-          cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
+          node-version: 22
+      - name: 接続先を決める
         env:
-          # 社内向けビルドでは、リポジトリの Variables に設定する（未設定なら github.com 向け）
-          IDEA_OUTLINER_DEFAULT_HOST: ${{ vars.IDEA_OUTLINER_DEFAULT_HOST }}
+          CONFIGURED_HOST: ${{ vars.IDEA_OUTLINER_DEFAULT_HOST }}
+        run: |
+          host="$CONFIGURED_HOST"
+          # GHES では、このワークフローが動いている GHE を接続先にする
+          if [ -z "$host" ] && [ "$GITHUB_SERVER_URL" != "https://github.com" ]; then
+            host="${GITHUB_SERVER_URL#https://}"
+            host="${host#http://}"
+          fi
+          echo "IDEA_OUTLINER_DEFAULT_HOST=$host" >> "$GITHUB_ENV"
+          echo "接続先: ${host:-github.com（固定しない）}"
+      - name: ビルド（GHES では接続先が固定されていることも確認する）
+        env:
           IDEA_OUTLINER_ALLOW_OTHER_HOSTS: ${{ vars.IDEA_OUTLINER_ALLOW_OTHER_HOSTS }}
+        run: |
+          if [ "$GITHUB_SERVER_URL" = "https://github.com" ]; then
+            npm ci --no-audit --no-fund
+            npm run build
+          else
+            scripts/deploy-pages.sh --no-pull --dry-run
+          fi
+      - run: npm test
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

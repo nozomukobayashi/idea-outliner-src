@@ -19,7 +19,7 @@ GitHub / GitHub Enterprise Server の Discussions と Issues を使った、チ�
 ## ドキュメント
 
 - [使い方（利用者向けセットアップガイド）](docs/SETUP.md)
-- [配布のしかた（Pages へのデプロイ、社内向けビルド）](docs/DEPLOY.md)
+- [配布のしかた（Pages へのデプロイ、社内向けビルド）](docs/DEPLOY.md)。社内 GHE Pages には `scripts/deploy-pages.sh` で 1 コマンドで置けます
 - [設計書](docs/DESIGN.md)
 
 ## 開発

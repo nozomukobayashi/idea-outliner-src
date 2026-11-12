@@ -29,6 +29,7 @@ TypeScript / Vite / Preact / Vitest。GraphQL を主に使い、必要なとこ�
 - `npm run build` `dist/` に出力（`npm run build:spike` は M0 の検証ページも含める）
 - `npm test` テスト
 - `npm run typecheck` 型チェック
+- `scripts/deploy-pages.sh <Pages 用リポジトリの URL>` 社内 GHE Pages へのデプロイ（取得・ビルド・確認・push）。社内 GHE にソースを置けば `.github/workflows/deploy-pages.yml` が push で自動デプロイする
 
 ## コードの配置
 - `src/config/` 接続設定・リポジトリ名 / `src/github/` API クライアント（`client.ts`）と取得処理（`api.ts`）

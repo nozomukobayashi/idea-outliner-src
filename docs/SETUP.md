@@ -64,6 +64,8 @@ GHE Pages で使っている場合は、同じ GHE の他の Pages サイトと�
 
 作成すると、行の末尾に `owner/repo#番号` が追記され、Open / Closed が色で表示されます。
 
+既存の Issue を参照するときは、行の中で `owner/` と打つとリポジトリ、`owner/repo#` と打つとその Issue が候補に出ます。番号や題名の一部で絞り込み、↑↓ で選んで Enter か Tab で確定します。
+
 ノートの先頭のコメントに `defaultRepo` を書いておくと、作成先の初期値になります。
 
 ```markdown

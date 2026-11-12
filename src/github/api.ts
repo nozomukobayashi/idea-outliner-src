@@ -458,3 +458,69 @@ export async function fetchIssueStates(client: GitHubClient, refs: IssueRef[]): 
   }
   return result;
 }
+
+/* ------------------------------------------------------------ Issue の補完 */
+
+export interface IssueCandidate {
+  number: number;
+  title: string;
+  state: IssueState;
+}
+
+interface RawCandidate {
+  number: number;
+  title: string;
+  state: string;
+  stateReason?: string | null;
+  repository?: { nameWithOwner: string };
+}
+
+const toCandidate = (n: RawCandidate): IssueCandidate => ({
+  number: n.number,
+  title: n.title,
+  state: n.state === 'OPEN' ? 'open' : n.stateReason === 'NOT_PLANNED' ? 'not_planned' : 'closed',
+});
+
+const CANDIDATE_FIELDS = 'number title state stateReason';
+
+/**
+ * 行の編集中に `owner/repo#` の候補として出す Issue。
+ * 数字だけ（または空）なら最近更新された Issue から番号で絞り、文字なら題名で検索する。見えないリポジトリは空。
+ */
+export async function searchIssues(client: GitHubClient, repo: RepoName, query: string, limit = 8): Promise<IssueCandidate[]> {
+  const q = query.trim();
+  if (q === '' || /^\d+$/.test(q)) {
+    const exact = q === '' ? '' : `exact: issue(number: ${Number(q)}) { ${CANDIDATE_FIELDS} }`;
+    const { data } = await client.graphqlRaw<{
+      repository: { issues: { nodes: (RawCandidate | null)[] }; exact?: RawCandidate | null } | null;
+    }>(
+      `query($owner: String!, $name: String!) {
+        repository(owner: $owner, name: $name) {
+          issues(first: 50, orderBy: { field: UPDATED_AT, direction: DESC }) { nodes { ${CANDIDATE_FIELDS} } }
+          ${exact}
+        }
+      }`,
+      { owner: repo.owner, name: repo.name },
+    );
+    const r = data?.repository;
+    if (!r) return [];
+    const recent = r.issues.nodes.filter((n): n is RawCandidate => n !== null && String(n.number).startsWith(q));
+    const list = r.exact ? [r.exact, ...recent.filter((n) => n.number !== r.exact?.number)] : recent;
+    return list.slice(0, limit).map(toCandidate);
+  }
+
+  // 検索の構文として解釈されないよう、引用符は取り除いて題名の語として渡す
+  const words = q.replace(/["\\]/g, ' ').trim();
+  const { data } = await client.graphqlRaw<{ search: { nodes: (RawCandidate | Record<string, never> | null)[] } }>(
+    `query($q: String!, $limit: Int!) {
+      search(type: ISSUE, first: $limit, query: $q) {
+        nodes { ... on Issue { ${CANDIDATE_FIELDS} repository { nameWithOwner } } }
+      }
+    }`,
+    { q: `repo:${repo.owner}/${repo.name} is:issue in:title ${words}`, limit },
+  );
+  const target = `${repo.owner}/${repo.name}`.toLowerCase();
+  return (data?.search.nodes ?? [])
+    .filter((n): n is RawCandidate => !!n && 'number' in n && n.repository?.nameWithOwner.toLowerCase() === target)
+    .map(toCandidate);
+}

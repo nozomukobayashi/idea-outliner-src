@@ -7,6 +7,7 @@ import { ja } from '../i18n/ja';
 import { hasPendingIdAssignments, normalizeItemText, noteItems, type ItemEntry } from '../note/format';
 import { findIssueRefs, refKey, uniqueRefs, type IssueRef } from '../note/issueRefs';
 import { buildLineComment, groupComments } from '../note/lineComment';
+import { applyCompletion, completionContext, completionKey } from '../note/completion';
 import {
   appendItem,
   cycleChecked,
@@ -28,6 +29,7 @@ import { dedent, renderBlock, renderInline, type ChipInfo, type ChipState, type 
 import { ConflictDialog } from './ConflictDialog';
 import { DiscussionPane } from './DiscussionPane';
 import { PromoteDialog } from './PromoteDialog';
+import { useCompletion, type CompletionItem } from './useCompletion';
 import { formatDateTime } from './datetime';
 import { ErrorMessage } from './ErrorMessage';
 import { useAsync } from './hooks';
@@ -166,7 +168,29 @@ function NoteEditor(props: { client: GitHubClient; note: Note; noteKey: string; 
     return lineRefs.length > 0 && lineRefs.every((r) => DONE_STATES.has(infoFor(r).state));
   };
 
-  const focusRow = (id: string, caret: number) => setEditing({ id, caret });
+  const [caretPos, setCaretPos] = useState(0);
+  const focusRow = (id: string, caret: number) => {
+    setEditing({ id, caret });
+    setCaretPos(caret);
+  };
+
+  // owner/repo# の補完。Esc で閉じた文脈では、入力が変わるまで出さない
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const [pick, setPick] = useState(0);
+  const completionItem = editing && canEdit ? (noteItems(doc).find((i) => i.id === editing.id) ?? null) : null;
+  const completionCtx = completionItem ? completionContext(completionItem.text, caretPos) : null;
+  const ctxKey = completionKey(completionCtx);
+  const activeCtx = ctxKey !== null && ctxKey !== dismissed ? completionCtx : null;
+  const completion = useCompletion(client, activeCtx);
+  useEffect(() => setPick(0), [ctxKey]);
+  const completionOpen = activeCtx !== null && completion.items.length > 0;
+  const acceptCompletion = (index: number) => {
+    const choice = completion.items[index];
+    if (!completionItem || !activeCtx || !choice) return;
+    const r = applyCompletion(completionItem.text, activeCtx, choice.value);
+    session.edit(setItemText(session.doc, completionItem.id, r.text));
+    focusRow(completionItem.id, r.caret);
+  };
 
   /** 親が折りたたまれていて行が隠れないように開く */
   const revealParent = (id: string) => {
@@ -194,6 +218,25 @@ function NoteEditor(props: { client: GitHubClient; note: Note; noteKey: string; 
   const onKeyDown = (e: KeyboardEvent, item: ItemEntry, hasChildren: boolean, isCollapsed: boolean) => {
     // 変換中のキーはすべて IME のもの（確定の Enter で行が分かれないように）
     if (e.isComposing || e.keyCode === 229) return;
+    // 候補が出ている間は、↑↓・Enter・Tab・Esc を補完に使う
+    if (completionOpen && editing?.id === item.id) {
+      const count = completion.items.length;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setPick((p) => (p + (e.key === 'ArrowDown' ? 1 : -1) + count) % count);
+        return;
+      }
+      if ((e.key === 'Enter' && !e.metaKey && !e.ctrlKey) || (e.key === 'Tab' && !e.shiftKey)) {
+        e.preventDefault();
+        acceptCompletion(pick);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setDismissed(ctxKey);
+        return;
+      }
+    }
     const ta = e.currentTarget as HTMLTextAreaElement;
     const start = ta.selectionStart;
     const end = ta.selectionEnd;
@@ -332,6 +375,7 @@ function NoteEditor(props: { client: GitHubClient; note: Note; noteKey: string; 
                 onCheck={() => session.edit(toggleChecked(session.doc, row.item.id))}
                 onStartEdit={() => focusRow(row.item.id, row.item.text.length)}
                 onInput={(text, caret) => {
+                  setCaretPos(caret);
                   const next = setItemText(session.doc, row.item.id, text);
                   session.edit(next);
                   // 行頭の [ ] が TODO に変わると文字数が変わるので、カーソルを合わせ直す
@@ -340,7 +384,13 @@ function NoteEditor(props: { client: GitHubClient; note: Note; noteKey: string; 
                 }}
                 onCaret={(caret) => {
                   if (editing?.id === row.item.id) editing.caret = caret;
+                  setCaretPos(caret);
                 }}
+                completion={
+                  editing?.id === row.item.id && activeCtx
+                    ? { items: completion.items, loading: completion.loading, index: pick, onPick: acceptCompletion }
+                    : null
+                }
                 onKeyDown={(e) => onKeyDown(e, row.item, row.hasChildren, row.collapsed)}
                 onBlur={() => setEditing((cur) => (cur?.id === row.item.id ? null : cur))}
               />
@@ -465,6 +515,7 @@ function OutlineRow(props: {
   onCaret: (caret: number) => void;
   onKeyDown: (e: KeyboardEvent) => void;
   onBlur: () => void;
+  completion: CompletionView | null;
 }) {
   const { item, editing } = props;
   const contHtml = useMemo(
@@ -500,7 +551,15 @@ function OutlineRow(props: {
           />
         )}
         {editing ? (
-          <LineInput item={item} editing={editing} onInput={props.onInput} onCaret={props.onCaret} onKeyDown={props.onKeyDown} onBlur={props.onBlur} />
+          <LineInput
+            item={item}
+            editing={editing}
+            onInput={props.onInput}
+            onCaret={props.onCaret}
+            onKeyDown={props.onKeyDown}
+            onBlur={props.onBlur}
+            completion={props.completion}
+          />
         ) : (
           <RenderedText item={item} renderOpts={props.renderOpts} canEdit={props.canEdit} onStartEdit={props.onStartEdit} />
         )}
@@ -541,6 +600,13 @@ function RenderedText(props: { item: ItemEntry; renderOpts: RenderOptions; canEd
   return <span class={`outline-text${props.canEdit ? ' editable' : ''}`} onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
+interface CompletionView {
+  items: CompletionItem[];
+  loading: boolean;
+  index: number;
+  onPick: (index: number) => void;
+}
+
 function LineInput(props: {
   item: ItemEntry;
   editing: Editing;
@@ -548,6 +614,7 @@ function LineInput(props: {
   onCaret: (caret: number) => void;
   onKeyDown: (e: KeyboardEvent) => void;
   onBlur: () => void;
+  completion: CompletionView | null;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -568,18 +635,54 @@ function LineInput(props: {
     ta.style.height = `${ta.scrollHeight}px`;
   }, [props.item.text]);
 
+  const c = props.completion;
+  const open = c !== null && (c.items.length > 0 || c.loading);
   return (
-    <textarea
-      ref={ref}
-      class="outline-input"
-      rows={1}
-      aria-label={t.lineText}
-      value={props.item.text}
-      spellcheck={false}
-      onInput={(e) => props.onInput(e.currentTarget.value, e.currentTarget.selectionStart)}
-      onSelect={(e) => props.onCaret(e.currentTarget.selectionStart)}
-      onKeyDown={props.onKeyDown}
-      onBlur={props.onBlur}
-    />
+    <>
+      <textarea
+        ref={ref}
+        class="outline-input"
+        rows={1}
+        aria-label={t.lineText}
+        aria-autocomplete="list"
+        aria-expanded={open}
+        value={props.item.text}
+        spellcheck={false}
+        onInput={(e) => props.onInput(e.currentTarget.value, e.currentTarget.selectionStart)}
+        onSelect={(e) => props.onCaret(e.currentTarget.selectionStart)}
+        onKeyDown={props.onKeyDown}
+        onBlur={props.onBlur}
+      />
+      {open && c && (
+        <ul class="completion" role="listbox" aria-label={t.completion.label}>
+          {c.items.length === 0 ? (
+            <li class="completion-empty">{t.completion.loading}</li>
+          ) : (
+            c.items.map((it, i) => (
+              <li
+                key={it.value}
+                role="option"
+                aria-selected={i === c.index}
+                class={i === c.index ? 'active' : ''}
+                // 押しても入力欄のフォーカスを外さない
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  c.onPick(i);
+                }}
+              >
+                {it.kind === 'repo' ? (
+                  <span class="mono">{it.value}</span>
+                ) : (
+                  <>
+                    <span class={`chip chip-${it.state}`}>#{it.number}</span>
+                    <span class="completion-title">{it.title}</span>
+                  </>
+                )}
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </>
   );
 }
